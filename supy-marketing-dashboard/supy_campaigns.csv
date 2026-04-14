@@ -1,0 +1,16 @@
+campaign_id,campaign_name,channel,status,start_date,end_date,budget_usd,spend_usd,impressions,clicks,leads,conversions,ctr_pct,conv_rate_pct,roas,cpc_usd,region
+C001,Supy Inventory Launch,Google Ads,completed,2025-01-05,2025-01-31,5000,4820,312000,8940,187,42,2.86,22.45,4.8,0.54,UAE
+C002,Restaurant AI Platform,LinkedIn,completed,2025-01-10,2025-02-10,3500,3490,98000,2156,134,28,2.20,20.89,5.2,1.62,UAE
+C003,F&B Procurement GCC,Google Ads,completed,2025-02-01,2025-02-28,6000,5910,428000,11200,243,56,2.62,23.04,5.6,0.53,GCC
+C004,Cloud Kitchen Webinar,Email,completed,2025-02-14,2025-02-28,800,790,0,4120,312,89,0,28.53,11.2,0.19,GCC
+C005,Supy Brand Awareness,Meta Ads,completed,2025-02-20,2025-03-20,4000,3870,780000,6240,98,18,0.80,18.36,3.1,0.62,Saudi Arabia
+C006,Inventory SaaS KSA,Google Ads,active,2025-03-01,2025-03-31,7000,4210,295000,7830,198,44,2.65,22.22,5.1,0.54,Saudi Arabia
+C007,Food Cost Tool Launch,LinkedIn,active,2025-03-05,2025-04-05,4500,2890,112000,2980,156,31,2.66,19.87,4.7,0.97,UAE
+C008,Re-engagement Q1,Email,active,2025-03-10,2025-03-31,600,410,0,3890,287,72,0,24.91,10.5,0.11,GCC
+C009,Supplier Platform Push,TikTok,active,2025-03-15,2025-04-15,2500,1340,1240000,9870,87,12,0.80,13.79,2.4,0.14,UAE
+C010,Restaurant BI Dashboard,Google Ads,active,2025-03-20,2025-04-20,5500,2100,187000,4920,112,26,2.63,23.21,5.3,0.43,GCC
+C011,Supy Partner Outreach,LinkedIn,planned,2025-04-01,2025-05-01,5000,0,0,0,0,0,0,0,0,0,GCC
+C012,Ramadan F&B Special,Meta Ads,planned,2025-04-05,2025-04-30,8000,0,0,0,0,0,0,0,0,0,GCC
+C013,Cloud POS Integration,Google Ads,planned,2025-04-10,2025-05-10,6500,0,0,0,0,0,0,0,0,0,UAE
+C014,Menu Engineering Tool,Email,planned,2025-04-15,2025-04-30,700,0,0,0,0,0,0,0,0,0,Saudi Arabia
+C015,HORECA Expo Follow-up,LinkedIn,planned,2025-04-20,2025-05-20,4000,0,0,0,0,0,0,0,0,0,UAE

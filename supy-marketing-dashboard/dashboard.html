@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Supy — Google Drive API Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#07080a; --surface:#0f1014; --surface2:#161820; --border:#1e2028;
+    --accent:#f0a500; --accent2:#ff5c3a; --green:#2de89b; --blue:#4dabf7; --purple:#9c6fe4;
+    --text:#e8e8ec; --muted:#5a5a6a;
+    --ff:'Syne',sans-serif; --fm:'DM Mono',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font-family:var(--fm);min-height:100vh;overflow-x:hidden}
+
+  /* animated bg */
+  body::before{
+    content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:
+      radial-gradient(ellipse 60% 40% at 20% 20%, rgba(240,165,0,.04) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 60% at 80% 80%, rgba(77,171,247,.03) 0%, transparent 60%);
+  }
+  body::after{
+    content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:linear-gradient(rgba(255,255,255,.012) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(255,255,255,.012) 1px,transparent 1px);
+    background-size:48px 48px;
+  }
+  .shell{position:relative;z-index:1}
+
+  /* ── HEADER ── */
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 40px;border-bottom:1px solid var(--border);
+    background:rgba(7,8,10,.92);backdrop-filter:blur(16px);
+    position:sticky;top:0;z-index:100;
+  }
+  .logo{font-family:var(--ff);font-weight:800;font-size:18px;letter-spacing:-.5px;display:flex;align-items:center;gap:10px}
+  .logo-mark{width:28px;height:28px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#000;font-weight:800}
+  .logo span{color:var(--accent)}
+  .hright{display:flex;align-items:center;gap:16px}
+  .status-pill{display:flex;align-items:center;gap:6px;font-size:11px;padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:var(--surface)}
+  .status-pill .dot{width:6px;height:6px;border-radius:50%}
+  .status-pill.idle .dot{background:var(--muted)}
+  .status-pill.loading .dot{background:var(--accent);animation:pulse 1s infinite}
+  .status-pill.live .dot{background:var(--green);box-shadow:0 0 6px var(--green)}
+  .status-pill.err .dot{background:var(--accent2)}
+  .status-pill.idle{color:var(--muted)}
+  .status-pill.live{color:var(--green);border-color:rgba(45,232,155,.2)}
+  .status-pill.err{color:var(--accent2);border-color:rgba(255,92,58,.2)}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.5)}}
+  .clock{font-size:11px;color:var(--muted)}
+
+  main{padding:36px 40px;max-width:1440px;margin:0 auto}
+
+  /* ── PAGE TITLE ── */
+  .ptitle{margin-bottom:28px;animation:fadeUp .5s ease both}
+  .ptitle h1{font-family:var(--ff);font-size:32px;font-weight:800;letter-spacing:-1.5px;line-height:1}
+  .ptitle h1 em{font-style:normal;background:linear-gradient(90deg,var(--accent),#ffcc44);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .ptitle p{margin-top:8px;font-size:11px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
+
+  /* ── API FLOW DIAGRAM ── */
+  .flow{
+    display:flex;align-items:center;gap:0;margin-bottom:24px;
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    padding:18px 24px;overflow-x:auto;animation:fadeUp .5s ease .05s both;
+  }
+  .fnode{
+    display:flex;flex-direction:column;align-items:center;gap:5px;
+    padding:10px 18px;border-radius:8px;border:1px solid var(--border);
+    background:var(--surface2);min-width:110px;flex-shrink:0;transition:border-color .3s;
+  }
+  .fnode.active{border-color:var(--green);box-shadow:0 0 12px rgba(45,232,155,.1)}
+  .fnode.pulse-node{border-color:var(--accent);animation:nodePulse 1s infinite}
+  @keyframes nodePulse{0%,100%{box-shadow:0 0 0 rgba(240,165,0,0)}50%{box-shadow:0 0 12px rgba(240,165,0,.2)}}
+  .fnode-icon{font-size:18px}
+  .fnode-name{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+  .fnode-status{font-size:10px;font-weight:500}
+  .fnode-status.ok{color:var(--green)} .fnode-status.wait{color:var(--muted)} .fnode-status.go{color:var(--accent)}
+  .farrow{font-size:14px;color:var(--border);padding:0 6px;flex-shrink:0;transition:color .3s}
+  .farrow.lit{color:var(--accent)}
+
+  /* ── CONFIG BOX ── */
+  .config{
+    background:var(--surface);border:1px solid rgba(240,165,0,.25);border-radius:12px;
+    padding:22px 26px;margin-bottom:28px;animation:fadeUp .5s ease .1s both;
+  }
+  .config-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px}
+  .config-title{font-family:var(--ff);font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px}
+  .step-badge{background:var(--accent);color:#000;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;letter-spacing:.05em}
+  .config-source{font-size:11px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 10px}
+  .url-row{display:flex;gap:10px;margin-bottom:14px}
+  .url-input{
+    flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+    padding:11px 16px;font-family:var(--fm);font-size:12px;color:var(--text);
+    outline:none;transition:border-color .2s,box-shadow .2s;
+  }
+  .url-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(240,165,0,.08)}
+  .url-input::placeholder{color:var(--muted)}
+  .fetch-btn{
+    background:var(--accent);color:#000;border:none;border-radius:8px;
+    padding:11px 22px;font-family:var(--ff);font-size:12px;font-weight:700;
+    cursor:pointer;transition:opacity .2s,transform .1s;white-space:nowrap;
+  }
+  .fetch-btn:hover{opacity:.88;transform:translateY(-1px)}
+  .fetch-btn:active{transform:translateY(0)}
+  .fetch-btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+  .config-help{font-size:11px;color:var(--muted);line-height:1.8;border-top:1px solid var(--border);padding-top:14px}
+  .config-help strong{color:var(--text)}
+  .config-help code{background:rgba(240,165,0,.1);color:var(--accent);padding:1px 6px;border-radius:3px;font-family:var(--fm);font-size:10px}
+  .config-help .step{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;background:var(--accent);color:#000;border-radius:50%;font-size:9px;font-weight:700;margin-right:4px}
+
+  /* ── KPIs ── */
+  .kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px}
+  .kpi{
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    padding:20px;position:relative;overflow:hidden;
+    animation:fadeUp .5s ease both;transition:border-color .25s,transform .2s;
+  }
+  .kpi:hover{border-color:rgba(240,165,0,.3);transform:translateY(-2px)}
+  .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+  .kpi.cg::before{background:linear-gradient(90deg,var(--green),transparent)}
+  .kpi.ca::before{background:linear-gradient(90deg,var(--accent),transparent)}
+  .kpi.cb::before{background:linear-gradient(90deg,var(--blue),transparent)}
+  .kpi.cr::before{background:linear-gradient(90deg,var(--accent2),transparent)}
+  .kpi.cp::before{background:linear-gradient(90deg,var(--purple),transparent)}
+  .kpi-icon{font-size:20px;margin-bottom:10px;opacity:.7}
+  .kpi-lbl{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+  .kpi-val{font-family:var(--ff);font-size:28px;font-weight:800;letter-spacing:-1px;line-height:1}
+  .kpi-sub{margin-top:6px;font-size:10px;color:var(--muted)}
+  .kpi-sub.g{color:var(--green)} .kpi-sub.a{color:var(--accent)}
+  .kpi:nth-child(1){animation-delay:.15s}.kpi:nth-child(2){animation-delay:.2s}
+  .kpi:nth-child(3){animation-delay:.25s}.kpi:nth-child(4){animation-delay:.3s}.kpi:nth-child(5){animation-delay:.35s}
+
+  /* ── GRIDS ── */
+  .g32{display:grid;grid-template-columns:3fr 2fr;gap:20px;margin-bottom:20px}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
+  .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-bottom:20px}
+
+  /* ── CARD ── */
+  .card{
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    padding:22px;animation:fadeUp .5s ease both;transition:border-color .2s;
+  }
+  .card:hover{border-color:rgba(240,165,0,.15)}
+  .ch{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:8px}
+  .ct{font-family:var(--ff);font-weight:700;font-size:13px;letter-spacing:-.3px}
+  .bdg{font-size:10px;letter-spacing:.07em;text-transform:uppercase;padding:3px 8px;border-radius:5px;border:1px solid}
+  .bdg.a{background:rgba(240,165,0,.08);color:var(--accent);border-color:rgba(240,165,0,.2)}
+  .bdg.g{background:rgba(45,232,155,.08);color:var(--green);border-color:rgba(45,232,155,.2)}
+  .bdg.b{background:rgba(77,171,247,.08);color:var(--blue);border-color:rgba(77,171,247,.2)}
+  .bdg.p{background:rgba(156,111,228,.08);color:var(--purple);border-color:rgba(156,111,228,.2)}
+
+  /* ── TABLE ── */
+  .tbl-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:11px;min-width:600px}
+  thead tr{border-bottom:1px solid var(--border)}
+  th{text-align:left;padding:0 8px 12px 0;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:400;white-space:nowrap}
+  tbody tr{border-bottom:1px solid rgba(30,32,40,.8);transition:background .15s,transform .1s}
+  tbody tr:hover{background:rgba(240,165,0,.02)}
+  td{padding:11px 8px 11px 0;vertical-align:middle}
+  .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;letter-spacing:.03em}
+  .pill.active{background:rgba(45,232,155,.1);color:var(--green);border:1px solid rgba(45,232,155,.2)}
+  .pill.completed{background:rgba(90,90,106,.1);color:var(--muted);border:1px solid rgba(90,90,106,.2)}
+  .pill.planned{background:rgba(240,165,0,.1);color:var(--accent);border:1px solid rgba(240,165,0,.2)}
+
+  /* ── CHANNEL BARS ── */
+  .ch-list{display:flex;flex-direction:column;gap:14px}
+  .ch-row{display:flex;align-items:center;gap:10px;font-size:11px}
+  .ch-name{width:80px;color:var(--muted);font-size:10px;white-space:nowrap}
+  .ch-bar{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+  .ch-fill{height:100%;border-radius:3px;width:0%;transition:width 1.4s cubic-bezier(.16,1,.3,1)}
+  .ch-val{width:55px;text-align:right;font-size:10px;font-family:var(--ff);font-weight:600}
+
+  /* ── REGION CARDS ── */
+  .region-grid{display:flex;flex-direction:column;gap:10px}
+  .region-card{
+    display:flex;align-items:center;gap:12px;padding:12px 14px;
+    background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+    transition:border-color .2s;
+  }
+  .region-card:hover{border-color:rgba(240,165,0,.2)}
+  .r-flag{font-size:20px;width:30px;text-align:center}
+  .r-name{flex:1;font-size:12px;font-weight:500}
+  .r-bar-wrap{width:80px}
+  .r-bar{height:3px;background:var(--border);border-radius:2px;margin-top:4px}
+  .r-bar-fill{height:100%;border-radius:2px;background:var(--accent);transition:width 1.4s cubic-bezier(.16,1,.3,1)}
+  .r-val{font-family:var(--ff);font-size:13px;font-weight:700;color:var(--accent)}
+  .r-pct{font-size:10px;color:var(--muted)}
+
+  /* ── CHART ── */
+  .chart-wrap{height:180px;position:relative}
+  canvas{width:100%!important;height:100%!important}
+
+  /* ── LOG ── */
+  .log-scroll{max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:0}
+  .log-scroll::-webkit-scrollbar{width:3px}
+  .log-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+  .log-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid rgba(30,32,40,.8);font-size:11px}
+  .log-item:last-child{border-bottom:none}
+  .log-dot{width:6px;height:6px;border-radius:50%;margin-top:3px;flex-shrink:0}
+  .log-dot.g{background:var(--green);box-shadow:0 0 4px var(--green)}
+  .log-dot.a{background:var(--accent)} .log-dot.b{background:var(--blue)} .log-dot.r{background:var(--accent2)}
+  .log-body{flex:1;line-height:1.5}
+  .log-time{font-size:10px;color:var(--muted);margin-top:2px}
+
+  /* ── RAW RESPONSE ── */
+  .raw-box{
+    background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+    padding:14px 16px;font-size:10px;color:var(--muted);font-family:var(--fm);
+    max-height:100px;overflow-y:auto;white-space:pre;line-height:1.6;
+    margin-top:0;
+  }
+  .raw-box::-webkit-scrollbar{width:3px}
+  .raw-box::-webkit-scrollbar-thumb{background:var(--border)}
+
+  /* ── EMPTY / LOADING / ERROR ── */
+  .empty-state{display:flex;align-items:center;justify-content:center;
+    height:100px;flex-direction:column;gap:8px;color:var(--muted);font-size:11px;text-align:center}
+  .spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .err-state{color:var(--accent2);font-size:11px;text-align:center;padding:20px;line-height:1.6}
+
+  /* ── FOOTER ── */
+  .foot{
+    margin-top:40px;padding-top:20px;border-top:1px solid var(--border);
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;
+    font-size:11px;color:var(--muted);
+  }
+  .foot a{color:var(--accent);text-decoration:none}
+  .foot .stack{display:flex;gap:8px;flex-wrap:wrap}
+  .tech-tag{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px}
+
+  @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+  @media(max-width:1000px){
+    main{padding:20px} header{padding:14px 20px}
+    .kpi-row{grid-template-columns:repeat(2,1fr)}
+    .g32,.g2,.g3{grid-template-columns:1fr}
+  }
+
+  /* ── RUN PANEL ── */
+  .run-panel{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+  .run-left{display:flex;flex-direction:column;gap:12px;flex:1}
+  .run-source{display:flex;align-items:center;gap:14px}
+  .run-icon{font-size:28px;width:44px;height:44px;background:rgba(240,165,0,.1);border:1px solid rgba(240,165,0,.2);border-radius:10px;display:flex;align-items:center;justify-content:center}
+  .run-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:3px}
+  .run-url{font-size:12px;color:var(--green);font-family:var(--fm);word-break:break-all}
+  .run-meta{display:flex;gap:8px;flex-wrap:wrap}
+  .meta-tag{font-size:10px;padding:3px 9px;border-radius:20px;background:var(--surface2);border:1px solid var(--border);color:var(--muted)}
+  .run-right{display:flex;flex-direction:column;align-items:center;gap:8px;flex-shrink:0}
+  .run-btn{
+    display:flex;align-items:center;gap:10px;
+    background:linear-gradient(135deg,var(--accent),#ffcc44);
+    color:#000;border:none;border-radius:12px;
+    padding:16px 32px;font-family:var(--ff);font-size:15px;font-weight:800;
+    cursor:pointer;transition:opacity .2s,transform .15s,box-shadow .2s;
+    box-shadow:0 4px 20px rgba(240,165,0,.3);letter-spacing:-.3px;
+  }
+  .run-btn:hover{opacity:.9;transform:translateY(-2px);box-shadow:0 8px 28px rgba(240,165,0,.4)}
+  .run-btn:active{transform:translateY(0);box-shadow:0 2px 10px rgba(240,165,0,.2)}
+  .run-btn:disabled{opacity:.35;cursor:not-allowed;transform:none;box-shadow:none}
+  .run-btn-icon{font-size:16px}
+  .run-btn-text{font-size:15px}
+  .run-hint{font-size:10px;color:var(--muted);text-align:center}
+  @keyframes spinIcon{to{transform:rotate(360deg)}}
+  .spin-icon{display:inline-block;animation:spinIcon .6s linear infinite}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-mark">S</div>
+    Supy<span>IQ</span>
+  </div>
+  <div class="hright">
+    <div class="status-pill idle" id="status-pill">
+      <div class="dot"></div>
+      <span id="status-text">Awaiting endpoint</span>
+    </div>
+    <div class="clock" id="clock">--:--:--</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- TITLE -->
+  <div class="ptitle">
+    <h1>Google Drive <em>API Pipeline</em></h1>
+    <p>Google Drive CSV → Apps Script API → Live Dashboard · 100% Free Tier</p>
+  </div>
+
+  <!-- FLOW DIAGRAM -->
+  <div class="flow">
+    <div class="fnode" id="fn-drive">
+      <div class="fnode-icon">☁️</div>
+      <div class="fnode-name">Google Drive</div>
+      <div class="fnode-status wait" id="fs-drive">CSV File</div>
+    </div>
+    <div class="farrow" id="fa1">→</div>
+    <div class="fnode" id="fn-sheets">
+      <div class="fnode-icon">📊</div>
+      <div class="fnode-name">Google Sheets</div>
+      <div class="fnode-status wait" id="fs-sheets">Data source</div>
+    </div>
+    <div class="farrow" id="fa2">→</div>
+    <div class="fnode" id="fn-api">
+      <div class="fnode-icon">⚡</div>
+      <div class="fnode-name">Apps Script</div>
+      <div class="fnode-status wait" id="fs-api">REST Endpoint</div>
+    </div>
+    <div class="farrow" id="fa3">→</div>
+    <div class="fnode" id="fn-fetch">
+      <div class="fnode-icon">🔄</div>
+      <div class="fnode-name">fetch() Call</div>
+      <div class="fnode-status wait" id="fs-fetch">HTTP GET</div>
+    </div>
+    <div class="farrow" id="fa4">→</div>
+    <div class="fnode" id="fn-parse">
+      <div class="fnode-icon">🧮</div>
+      <div class="fnode-name">Parse + Transform</div>
+      <div class="fnode-status wait" id="fs-parse">JSON → KPIs</div>
+    </div>
+    <div class="farrow" id="fa5">→</div>
+    <div class="fnode" id="fn-dash">
+      <div class="fnode-icon">📈</div>
+      <div class="fnode-name">Dashboard</div>
+      <div class="fnode-status wait" id="fs-dash">Waiting</div>
+    </div>
+  </div>
+
+  <!-- MANUAL RUN PANEL -->
+  <div class="config">
+    <div class="run-panel">
+      <div class="run-left">
+        <div class="run-source">
+          <span class="run-icon">☁️</span>
+          <div>
+            <div class="run-label">DATA SOURCE</div>
+            <div class="run-url" id="run-url-display">Google Drive → Sheets → Apps Script API</div>
+          </div>
+        </div>
+        <div class="run-meta">
+          <span class="meta-tag">🔑 Authenticated</span>
+          <span class="meta-tag">📄 CSV</span>
+          <span class="meta-tag">⚡ REST GET</span>
+          <span class="meta-tag" id="last-run-tag">Never run</span>
+        </div>
+      </div>
+      <div class="run-right">
+        <button class="run-btn" id="fetch-btn" onclick="callAPI()">
+          <span class="run-btn-icon">▶</span>
+          <span class="run-btn-text">Run Pipeline</span>
+        </button>
+        <div class="run-hint">Fetches live from Google Drive</div>
+      </div>
+    </div>
+    <input type="hidden" id="api-url" value="https://script.google.com/macros/s/AKfycbzKe9LCbLXrq8-tAdSibYQwGf_f6dVem8WF8sHc1YvaMm8d6C1YnE6Zo4IQoBbA7z88/exec">
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-row">
+    <div class="kpi ca">
+      <div class="kpi-icon">💰</div>
+      <div class="kpi-lbl">Total Budget</div>
+      <div class="kpi-val" id="k-budget">—</div>
+      <div class="kpi-sub a" id="ks-budget">From API</div>
+    </div>
+    <div class="kpi cg">
+      <div class="kpi-icon">🎯</div>
+      <div class="kpi-lbl">Total Leads</div>
+      <div class="kpi-val" id="k-leads">—</div>
+      <div class="kpi-sub g" id="ks-leads">Active + completed</div>
+    </div>
+    <div class="kpi cb">
+      <div class="kpi-icon">📈</div>
+      <div class="kpi-lbl">Avg ROAS</div>
+      <div class="kpi-val" id="k-roas">—</div>
+      <div class="kpi-sub" id="ks-roas">Completed only</div>
+    </div>
+    <div class="kpi cp">
+      <div class="kpi-icon">✅</div>
+      <div class="kpi-lbl">Conversions</div>
+      <div class="kpi-val" id="k-conv">—</div>
+      <div class="kpi-sub" id="ks-conv">Total closed</div>
+    </div>
+    <div class="kpi cr">
+      <div class="kpi-icon">🔴</div>
+      <div class="kpi-lbl">Active Now</div>
+      <div class="kpi-val" id="k-active">—</div>
+      <div class="kpi-sub" id="ks-active">Live campaigns</div>
+    </div>
+  </div>
+
+  <!-- TABLE + CHANNELS -->
+  <div class="g32">
+    <div class="card">
+      <div class="ch">
+        <span class="ct">Campaign Data</span>
+        <span class="bdg a" id="tbl-badge">Awaiting API</span>
+      </div>
+      <div class="tbl-wrap" id="tbl-wrap">
+        <div class="empty-state">Paste your Apps Script URL above and click Fetch</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch">
+        <span class="ct">Spend by Channel</span>
+        <span class="bdg g">Computed</span>
+      </div>
+      <div class="ch-list" id="ch-wrap">
+        <div class="empty-state">No data yet</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHART + REGION -->
+  <div class="g2">
+    <div class="card">
+      <div class="ch">
+        <span class="ct">Lead Volume by Campaign</span>
+        <span class="bdg b">Bar Chart</span>
+      </div>
+      <div class="chart-wrap"><canvas id="lchart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="ch">
+        <span class="ct">Budget by Region</span>
+        <span class="bdg a">GCC Markets</span>
+      </div>
+      <div class="region-grid" id="region-wrap">
+        <div class="empty-state">No data yet</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RAW RESPONSE + LOG -->
+  <div class="g2">
+    <div class="card">
+      <div class="ch">
+        <span class="ct">Raw API Response</span>
+        <span class="bdg p">JSON · Debug</span>
+      </div>
+      <div class="raw-box" id="raw-box">// API response from Apps Script will appear here...</div>
+    </div>
+    <div class="card">
+      <div class="ch">
+        <span class="ct">Pipeline Execution Log</span>
+        <span class="bdg g">Live</span>
+      </div>
+      <div class="log-scroll" id="log-wrap">
+        <div class="log-item">
+          <div class="log-dot b"></div>
+          <div><div class="log-body">Dashboard initialised — paste your Apps Script endpoint URL</div><div class="log-time">Just now</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span>Built by Valiveti Aiswarya Akanksha &nbsp;·&nbsp; <a href="mailto:aiswarya.akanksha@gmail.com">aiswarya.akanksha@gmail.com</a></span>
+    <div class="stack">
+      <span class="tech-tag">Google Drive</span>
+      <span class="tech-tag">Google Sheets</span>
+      <span class="tech-tag">Apps Script API</span>
+      <span class="tech-tag">fetch()</span>
+      <span class="tech-tag">JSON</span>
+      <span class="tech-tag">Free Tier</span>
+    </div>
+  </div>
+
+</main>
+</div>
+
+<script>
+// ── CLOCK ──
+setInterval(() => {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+}, 1000);
+
+// ── LOG ──
+const logEntries = [];
+function log(dot, msg) {
+  const t = new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  logEntries.unshift({dot, msg, t});
+  document.getElementById('log-wrap').innerHTML = logEntries.slice(0, 20).map(l => `
+    <div class="log-item">
+      <div class="log-dot ${l.dot}"></div>
+      <div><div class="log-body">${l.msg}</div><div class="log-time">${l.t}</div></div>
+    </div>`).join('');
+}
+
+// ── FLOW STATE ──
+function setFlow(id, state, text) {
+  const node = document.getElementById('fn-' + id);
+  const status = document.getElementById('fs-' + id);
+  if (!node || !status) return;
+  node.className = 'fnode' + (state === 'ok' ? ' active' : state === 'loading' ? ' pulse-node' : '');
+  status.className = 'fnode-status ' + (state === 'ok' ? 'ok' : state === 'loading' ? 'go' : 'wait');
+  if (text) status.textContent = text;
+}
+function litArrow(id) {
+  const el = document.getElementById('fa' + id);
+  if (el) el.className = 'farrow lit';
+}
+
+// ── STATUS PILL ──
+function setStatus(state, text) {
+  const el = document.getElementById('status-pill');
+  el.className = 'status-pill ' + state;
+  document.getElementById('status-text').textContent = text;
+}
+
+// ── ANIMATE NUMBER ──
+function animCount(el, target, prefix = '', suffix = '', dec = 0) {
+  const s = Date.now(), d = 1000;
+  const step = () => {
+    const p = Math.min((Date.now() - s) / d, 1);
+    const e = 1 - Math.pow(1 - p, 3);
+    el.textContent = prefix + (target * e).toFixed(dec) + suffix;
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+// ══════════════════════════════════════════════
+//  MAIN API CALL
+// ══════════════════════════════════════════════
+async function callAPI() {
+  const url = document.getElementById('api-url').value.trim();
+  const btn = document.getElementById('fetch-btn');
+
+  if (!url) { log('r', 'Error: No API URL provided'); return; }
+  if (!url.startsWith('https://')) { log('r', 'Error: URL must start with https://'); return; }
+
+  // ── Reset UI ──
+  btn.disabled = true; btn.innerHTML = '<span class="run-btn-icon spin-icon">⏳</span><span class="run-btn-text">Fetching...</span>';
+  setStatus('loading', 'Connecting...');
+  document.getElementById('raw-box').textContent = 'Calling API...';
+  ['tbl-wrap', 'ch-wrap', 'region-wrap'].forEach(id => {
+    document.getElementById(id).innerHTML = '<div class="empty-state"><div class="spinner"></div><span>Loading from API...</span></div>';
+  });
+
+  // Animate flow
+  setFlow('drive', 'ok', 'CSV ready');
+  litArrow(1);
+  setFlow('sheets', 'ok', 'Sheet open');
+  litArrow(2);
+  setFlow('api', 'loading', 'Processing...');
+
+  log('b', `GET → ${url.slice(0, 70)}...`);
+
+  try {
+    const t0 = Date.now();
+    litArrow(3);
+    setFlow('fetch', 'loading', 'Fetching...');
+
+    // ── THE ACTUAL API CALL ──
+    const res = await fetch(url);
+    const elapsed = Date.now() - t0;
+
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+
+    const rawText = await res.text();
+    document.getElementById('raw-box').textContent = rawText.slice(0, 500) + (rawText.length > 500 ? '\n...[truncated]' : '');
+
+    log('g', `API responded: HTTP 200 in ${elapsed}ms · ${rawText.length} bytes`);
+    setFlow('fetch', 'ok', `200 · ${elapsed}ms`);
+    setFlow('api', 'ok', 'Response received');
+    litArrow(4);
+
+    // ── PARSE JSON ──
+    setFlow('parse', 'loading', 'Parsing...');
+    let json;
+    try {
+      json = JSON.parse(rawText);
+    } catch (e) {
+      throw new Error('Response is not valid JSON. Make sure Apps Script returns ContentService JSON.');
+    }
+
+    if (json.status === 'error') throw new Error('Apps Script error: ' + json.message);
+
+    // Support both { data: [...] } and raw array
+    const rows = Array.isArray(json) ? json : (json.data || json.campaigns || []);
+    if (!rows.length) throw new Error('API returned 0 rows. Check your Sheet name and data.');
+
+    log('g', `Parsed ${rows.length} rows from API response`);
+    log('b', `Source: ${json.source || 'Google Drive → Apps Script'}`);
+    if (json.fetched_at) log('b', `Data timestamp: ${json.fetched_at}`);
+
+    litArrow(5);
+    setFlow('parse', 'ok', `${rows.length} rows`);
+    setFlow('dash', 'loading', 'Rendering...');
+
+    // ── RENDER ──
+    renderDashboard(rows);
+    setFlow('dash', 'ok', 'Live ✓');
+    setStatus('live', `Live · ${rows.length} rows · ${elapsed}ms`);
+    document.getElementById('tbl-badge').textContent = `${rows.length} rows · Apps Script API`;
+    document.getElementById('last-run-tag').textContent = '🕐 Last run: ' + new Date().toLocaleTimeString();
+    log('g', `Dashboard fully rendered from Google Drive data`);
+
+  } catch (e) {
+    setFlow('fetch', 'ok', 'Done');
+    setFlow('parse', 'ok', 'Error');
+    setStatus('err', 'Fetch failed');
+    log('r', `Error: ${e.message}`);
+    log('a', 'Check: Is the deployment set to "Anyone"? Did you re-deploy after editing?');
+    ['tbl-wrap', 'ch-wrap', 'region-wrap'].forEach(id => {
+      document.getElementById(id).innerHTML = `<div class="err-state">⚠ ${e.message}</div>`;
+    });
+  } finally {
+    btn.disabled = false; btn.innerHTML = '<span class="run-btn-icon">▶</span><span class="run-btn-text">Run Pipeline</span>';
+  }
+}
+
+// ══════════════════════════════════════════════
+//  RENDER DASHBOARD FROM API DATA
+// ══════════════════════════════════════════════
+function renderDashboard(rows) {
+  // Normalize field names (handle different CSV column naming)
+  const norm = rows.map(r => {
+    const n = {};
+    Object.entries(r).forEach(([k, v]) => { n[k.toLowerCase().replace(/\s+/g, '_')] = v; });
+    return n;
+  });
+
+  const active = norm.filter(r => (r.status || '').toLowerCase() === 'active');
+  const done   = norm.filter(r => (r.status || '').toLowerCase() === 'completed');
+
+  const totalBudget = norm.reduce((s, r) => s + (Number(r.budget_usd) || 0), 0);
+  const totalLeads  = norm.reduce((s, r) => s + (Number(r.leads) || 0), 0);
+  const totalConv   = norm.reduce((s, r) => s + (Number(r.conversions) || 0), 0);
+  const avgRoas     = done.length ? done.reduce((s, r) => s + (Number(r.roas) || 0), 0) / done.length : 0;
+
+  // KPIs
+  animCount(document.getElementById('k-budget'), totalBudget, '$', '', 0);
+  animCount(document.getElementById('k-leads'), totalLeads);
+  animCount(document.getElementById('k-roas'), avgRoas, '', 'x', 1);
+  animCount(document.getElementById('k-conv'), totalConv);
+  animCount(document.getElementById('k-active'), active.length);
+
+  renderTable(norm);
+  renderChannels(norm);
+  renderChart(norm);
+  renderRegions(norm);
+}
+
+// ── TABLE ──
+function renderTable(rows) {
+  const wrap = document.getElementById('tbl-wrap');
+  const cols = ['campaign_id','campaign_name','channel','status','leads','roas','budget_usd'];
+  const labels = ['ID','Campaign','Channel','Status','Leads','ROAS','Budget'];
+
+  const tbl = document.createElement('table');
+  tbl.innerHTML = `<thead><tr>${labels.map(l => `<th>${l}</th>`).join('')}</tr></thead><tbody></tbody>`;
+  const tb = tbl.querySelector('tbody');
+
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    const status = (r.status || '').toLowerCase();
+    const roas = Number(r.roas) || 0;
+    tr.innerHTML = `
+      <td style="color:var(--muted);font-size:10px">${r.campaign_id || '—'}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${r.campaign_name || '—'}</td>
+      <td style="color:var(--muted)">${r.channel || '—'}</td>
+      <td><span class="pill ${status}">${r.status || '—'}</span></td>
+      <td>${r.leads || '—'}</td>
+      <td style="color:${roas>4?'var(--green)':roas>0?'var(--text)':'var(--muted)'}">${roas > 0 ? roas + 'x' : '—'}</td>
+      <td>$${Number(r.budget_usd || 0).toLocaleString()}</td>`;
+    tb.appendChild(tr);
+  });
+
+  wrap.innerHTML = '';
+  wrap.appendChild(tbl);
+}
+
+// ── CHANNEL BARS ──
+function renderChannels(rows) {
+  const map = {};
+  rows.forEach(r => { const ch = r.channel || 'Unknown'; map[ch] = (map[ch] || 0) + (Number(r.spend_usd) || 0); });
+  const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]);
+  const max = sorted[0]?.[1] || 1;
+  const colors = ['#f0a500','#2de89b','#4dabf7','#ff5c3a','#9c6fe4','#44ddbb'];
+
+  const wrap = document.getElementById('ch-wrap');
+  wrap.innerHTML = '';
+  sorted.forEach(([ch, spend], i) => {
+    const d = document.createElement('div'); d.className = 'ch-row';
+    d.innerHTML = `
+      <span class="ch-name">${ch}</span>
+      <div class="ch-bar"><div class="ch-fill" data-w="${spend/max*100}" style="background:${colors[i]||colors[0]}"></div></div>
+      <span class="ch-val" style="color:${colors[i]||colors[0]}">$${spend.toLocaleString()}</span>`;
+    wrap.appendChild(d);
+  });
+  setTimeout(() => { document.querySelectorAll('.ch-fill').forEach(el => { el.style.width = el.dataset.w + '%'; }); }, 100);
+}
+
+// ── CHART ──
+function renderChart(rows) {
+  const canvas = document.getElementById('lchart');
+  const ctx = canvas.getContext('2d');
+  const data = rows.filter(r => Number(r.leads) > 0).slice(0, 10);
+
+  function draw() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const W = rect.width, H = rect.height;
+    const pad = {top:10, right:10, bottom:38, left:38};
+    const iW = W - pad.left - pad.right, iH = H - pad.top - pad.bottom;
+    const max = Math.max(...data.map(r => Number(r.leads))) * 1.15 || 1;
+    const bw = iW / data.length * 0.55, gap = iW / data.length;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // grid lines
+    [0, .25, .5, .75, 1].forEach(frac => {
+      const y = pad.top + iH * (1 - frac);
+      ctx.strokeStyle = 'rgba(30,32,40,.8)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+      ctx.fillStyle = 'rgba(90,90,106,.5)'; ctx.font = '9px DM Mono,monospace'; ctx.textAlign = 'right';
+      ctx.fillText(Math.round(max * frac), pad.left - 5, y + 3);
+    });
+
+    data.forEach((r, i) => {
+      const leads = Number(r.leads);
+      const x = pad.left + gap * i + (gap - bw) / 2;
+      const bh = (leads / max) * iH, y = pad.top + iH - bh;
+      const col = r.status === 'active' ? '#f0a500' : r.status === 'completed' ? '#2de89b' : '#4dabf7';
+      const g = ctx.createLinearGradient(0, y, 0, y + bh);
+      g.addColorStop(0, col); g.addColorStop(1, col + '33');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.roundRect(x, y, bw, bh, 3); ctx.fill();
+
+      // value label on bar
+      ctx.fillStyle = col; ctx.font = 'bold 9px DM Mono,monospace'; ctx.textAlign = 'center';
+      if (bh > 16) ctx.fillText(leads, x + bw / 2, y + 12);
+
+      // x label
+      ctx.fillStyle = 'rgba(90,90,106,.7)'; ctx.font = '8px DM Mono,monospace';
+      const name = (r.campaign_name || '').split(' ').slice(0, 2).join(' ');
+      ctx.fillText(name, x + bw / 2, H - 4);
+    });
+  }
+
+  draw(); window.addEventListener('resize', draw);
+}
+
+// ── REGIONS ──
+function renderRegions(rows) {
+  const map = {};
+  rows.forEach(r => { const reg = r.region || 'Other'; map[reg] = (map[reg] || 0) + (Number(r.budget_usd) || 0); });
+  const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]);
+  const total = sorted.reduce((s, [, v]) => s + v, 0) || 1;
+  const flags = { UAE: '🇦🇪', 'Saudi Arabia': '🇸🇦', GCC: '🌍', Kuwait: '🇰🇼', Qatar: '🇶🇦', Bahrain: '🇧🇭', Oman: '🇴🇲' };
+
+  const wrap = document.getElementById('region-wrap');
+  wrap.innerHTML = '';
+  sorted.forEach(([region, budget]) => {
+    const pct = Math.round(budget / total * 100);
+    const d = document.createElement('div'); d.className = 'region-card';
+    d.innerHTML = `
+      <span class="r-flag">${flags[region] || '🌐'}</span>
+      <div style="flex:1">
+        <div class="r-name">${region}</div>
+        <div class="r-bar"><div class="r-bar-fill" data-w="${pct}"></div></div>
+      </div>
+      <div style="text-align:right">
+        <div class="r-val">$${budget.toLocaleString()}</div>
+        <div class="r-pct">${pct}% of total</div>
+      </div>`;
+    wrap.appendChild(d);
+  });
+  setTimeout(() => { document.querySelectorAll('.r-bar-fill').forEach(el => { el.style.width = el.dataset.w + '%'; }); }, 100);
+}
+
+// ── ENTER KEY ──
+document.getElementById('api-url').addEventListener('keydown', e => { if (e.key === 'Enter') callAPI(); });
+
+// ── READY STATE ──
+window.addEventListener('load', () => {
+  log('g', 'Dashboard ready — click Run Pipeline to fetch data from Google Drive');
+  log('b', 'Endpoint: Apps Script → Google Sheets → Google Drive CSV');
+});
+</script>
+</body>
+</html>
